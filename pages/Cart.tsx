@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Minus, Plus, Trash2, Sparkles, ChefHat, ArrowLeft, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { mockApi } from '../services/mockBackend';
+import { api } from '../services/apiService';
 import { generateRecipe } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 
@@ -42,29 +42,30 @@ const Cart: React.FC = () => {
     // If no coupon is manually applied, and total > 2000, apply the generic discount
     const checkAutoApply = async () => {
       if (subtotal >= 2000 && !appliedCouponCode) {
-         // Auto apply the generic 'AUTO50' coupon if it exists in system
-         const result = await mockApi.validateCoupon('AUTO50', subtotal);
-         if (result.isValid && result.coupon) {
-             setAppliedCoupon(result.coupon.discountAmount);
-             setAppliedCouponCode('AUTO50');
-             setAutoApplied(true);
-         }
+        const coupons = await api.getCoupons();
+        const autoCoupon = coupons.find(c => c.code === 'AUTO50');
+        if (autoCoupon && subtotal >= autoCoupon.minOrderAmount) {
+          setAppliedCoupon(autoCoupon.discountAmount);
+          setAppliedCouponCode('AUTO50');
+          setAutoApplied(true);
+        }
       }
       // If user drops below 2000 and it was auto-applied, remove it
       if (subtotal < 2000 && autoApplied) {
-          setAppliedCoupon(0);
-          setAppliedCouponCode('');
-          setAutoApplied(false);
+        setAppliedCoupon(0);
+        setAppliedCouponCode('');
+        setAutoApplied(false);
       }
     };
     checkAutoApply();
   }, [subtotal, appliedCouponCode, autoApplied]);
 
   const handleApplyCoupon = async () => {
-    const result = await mockApi.validateCoupon(couponCode, subtotal);
-    if (result.isValid && result.coupon) {
-      setAppliedCoupon(result.coupon.discountAmount);
-      setAppliedCouponCode(result.coupon.code);
+    const coupons = await api.getCoupons();
+    const coupon = coupons.find(c => c.code === couponCode);
+    if (coupon && subtotal >= coupon.minOrderAmount) {
+      setAppliedCoupon(coupon.discountAmount);
+      setAppliedCouponCode(coupon.code);
       setCouponError('');
       setAutoApplied(false); // Manual override
       setCouponCode('');

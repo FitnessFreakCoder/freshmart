@@ -25,15 +25,17 @@ const Login: React.FC = () => {
     setError('');
     
     try {
+      const { api } = await import('../services/apiService');
       let user;
       if (isRegister) {
-         user = await mockApi.register(username, email, password);
+        user = await api.register({ username, email, password });
       } else {
-         user = await mockApi.login(identifier, password);
+        user = await api.login({ identifier, password });
       }
-      
-      dispatch({ type: 'SET_USER', payload: user });
-      navigate(user.role === 'ADMIN' ? '/admin' : '/');
+      dispatch({ type: 'SET_USER', payload: user.user });
+      // Save token to localStorage for later API calls
+      localStorage.setItem('token', user.token);
+      navigate(user.user.role === 'ADMIN' ? '/admin' : '/');
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {

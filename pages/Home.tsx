@@ -5,7 +5,7 @@ import ProductCard from '../components/ProductCard';
 import { Search, ChevronRight } from 'lucide-react';
 
 const Home: React.FC = () => {
-  const { state } = useStore();
+    const { state } = useStore();
   const [search, setSearch] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState('All');
 

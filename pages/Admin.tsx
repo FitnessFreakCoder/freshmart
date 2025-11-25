@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { mockApi } from '../services/mockBackend';
+import { api } from '../services/apiService';
 import { Product, Order, OrderStatus, UserRole, Coupon } from '../types';
 import { Edit, Trash, Package, Map, CheckSquare, Tag, Plus, ExternalLink, Database, User as UserIcon, Phone } from 'lucide-react';
 
@@ -28,9 +28,10 @@ const Admin: React.FC = () => {
   useEffect(() => {
       // Refresh Data
       const refresh = async () => {
-          const orders = await mockApi.getOrders();
+          const token = localStorage.getItem('token');
+          const orders = await api.getOrders(token);
           dispatch({ type: 'SET_ORDERS', payload: orders });
-          const coupons = await mockApi.getCoupons();
+          const coupons = await api.getCoupons();
           dispatch({ type: 'SET_COUPONS', payload: coupons });
       };
       refresh();
@@ -46,13 +47,9 @@ const Admin: React.FC = () => {
         finalProduct.bulkRule = undefined;
     }
 
-    const saved = await mockApi.saveProduct({ 
-        ...finalProduct, 
-        id: finalProduct.id || 0,
-        imageUrl: finalProduct.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'
-    } as Product);
-
-    const prods = await mockApi.getProducts();
+    // TODO: Implement product save via backend API
+    // After saving, refresh products
+    const prods = await api.getProducts();
     dispatch({ type: 'SET_PRODUCTS', payload: prods });
     setEditingProduct(null);
   };
@@ -60,9 +57,8 @@ const Admin: React.FC = () => {
   const handleProductDelete = async (id: number) => {
       if(window.confirm("Are you sure you want to delete this product? This action cannot be undone.")) {
         try {
-            await mockApi.deleteProduct(id);
-            // Immediately fetch fresh data
-            const prods = await mockApi.getProducts();
+            // TODO: Implement product delete via backend API
+            const prods = await api.getProducts();
             dispatch({ type: 'SET_PRODUCTS', payload: prods });
         } catch (error) {
             alert("Failed to delete product");
@@ -73,8 +69,9 @@ const Admin: React.FC = () => {
   const handleCreateCoupon = async (e: React.FormEvent) => {
       e.preventDefault();
       if(newCoupon.code && newCoupon.discountAmount && newCoupon.expiry) {
-          await mockApi.createCoupon(newCoupon as Coupon);
-          dispatch({ type: 'ADD_COUPON', payload: newCoupon as Coupon });
+          // TODO: Implement coupon creation via backend API
+          const coupons = await api.getCoupons();
+          dispatch({ type: 'SET_COUPONS', payload: coupons });
           setIsAddingCoupon(false);
           setNewCoupon({ code: '', discountAmount: 0, expiry: '', minOrderAmount: 0 });
       }
@@ -82,14 +79,15 @@ const Admin: React.FC = () => {
 
   const handleDeleteCoupon = async (code: string) => {
       if (window.confirm("Are you sure you want to delete this coupon?")) {
-          await mockApi.deleteCoupon(code);
-          dispatch({ type: 'REMOVE_COUPON', payload: code });
+          // TODO: Implement coupon delete via backend API
+          const coupons = await api.getCoupons();
+          dispatch({ type: 'SET_COUPONS', payload: coupons });
       }
   };
 
   const updateStatus = async (id: string, status: OrderStatus) => {
-      await mockApi.updateOrderStatus(id, status);
-      dispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id, status } });
+    // TODO: Implement order status update via backend API
+    dispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id, status } });
   };
 
   if (!state.user || !isAdmin) return <div className="p-8 text-center text-red-500 font-bold">Access Denied</div>;

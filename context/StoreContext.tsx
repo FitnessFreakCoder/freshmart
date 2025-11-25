@@ -98,11 +98,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Initial Load
   useEffect(() => {
     const init = async () => {
-      const prods = await mockApi.getProducts();
-      dispatch({ type: 'SET_PRODUCTS', payload: prods });
-      
-      const coupons = await mockApi.getCoupons();
-      dispatch({ type: 'SET_COUPONS', payload: coupons });
+      try {
+        const { api } = await import('../services/apiService');
+        const prods = await api.getProducts();
+        dispatch({ type: 'SET_PRODUCTS', payload: prods });
+        const coupons = await api.getCoupons();
+        dispatch({ type: 'SET_COUPONS', payload: coupons });
+      } catch (err) {
+        console.error('API error:', err);
+      }
     };
     init();
   }, []);

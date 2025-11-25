@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useLocation as useRouteLocation, useNavigate } from 'react-router-dom';
-import { mockApi } from '../services/mockBackend';
+import { api } from '../services/apiService';
 import { Order, OrderStatus } from '../types';
 import { MapPin, Loader, CheckCircle, Edit2, ShoppingBag, Banknote, Phone, X, ArrowLeft } from 'lucide-react';
 
@@ -61,14 +61,8 @@ const Checkout: React.FC = () => {
       async (position) => {
         const { latitude, longitude } = position.coords;
         setCoords({ lat: latitude, lng: longitude });
-        try {
-          const addr = await mockApi.reverseGeocode(latitude, longitude);
-          setAddress(addr);
-        } catch (e) {
-          setAddress('Address fetch failed. Please enter manually.');
-        } finally {
-          setLoadingGeo(false);
-        }
+        // Optionally, use a third-party geocoding API here if needed
+        setLoadingGeo(false);
       },
       (err) => {
         console.error(err);
@@ -125,9 +119,9 @@ const Checkout: React.FC = () => {
       createdAt: new Date().toISOString()
     };
 
-    await mockApi.placeOrder(newOrder);
-    dispatch({ type: 'PLACE_ORDER', payload: newOrder });
-    
+    const token = localStorage.getItem('token');
+    const placedOrder = await api.placeOrder(newOrder, token);
+    dispatch({ type: 'PLACE_ORDER', payload: placedOrder });
     // Persist user mobile locally in state so it shows up next time
     dispatch({ type: 'UPDATE_USER_MOBILE', payload: mobile });
 
