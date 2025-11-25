@@ -1,0 +1,143 @@
+
+import React, { useState } from 'react';
+import { Product } from '../types';
+import { Plus, Minus, Clock, Tag } from 'lucide-react';
+import { useStore } from '../context/StoreContext';
+
+interface Props {
+  product: Product;
+}
+
+const ProductCard: React.FC<Props> = ({ product }) => {
+  const { state, dispatch } = useStore();
+  
+  // Get current quantity in cart
+  const cartItem = state.cart.find(i => i.id === product.id);
+  const qty = cartItem ? cartItem.quantity : 0;
+
+  const handleAdd = () => {
+    dispatch({ type: 'ADD_TO_CART', payload: product });
+  };
+
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    dispatch({ type: 'ADD_TO_CART', payload: product });
+  };
+
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    dispatch({ type: 'UPDATE_CART_QTY', payload: { id: product.id, qty: qty - 1 } });
+  };
+
+  // Calculate discount percentage if original price exists
+  const discountPct = product.originalPrice 
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
+    : 0;
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 flex flex-col h-full group relative">
+      {/* Image Area */}
+      <div className="h-40 relative bg-gray-50 flex justify-center items-center overflow-hidden">
+        <img 
+          src={product.imageUrl} 
+          alt={product.name} 
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        
+        {/* Discount Badge */}
+        {discountPct > 0 && (
+          <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10">
+            {discountPct}% OFF
+          </div>
+        )}
+
+        {/* Out of Stock Overlay */}
+        {product.stock === 0 && (
+          <div className="absolute inset-0 bg-white bg-opacity-60 flex items-center justify-center z-20">
+             <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded">
+               Out of Stock
+             </span>
+          </div>
+        )}
+      </div>
+
+      {/* Content Area */}
+      <div className="p-3 flex flex-col flex-grow">
+        
+        {/* Delivery Time Mock */}
+        <div className="flex items-center gap-1 mb-2 bg-gray-100 self-start px-1.5 py-0.5 rounded text-[10px] text-gray-600 font-medium">
+             <Clock size={10} /> 12 MINS
+        </div>
+
+        {/* Title & Unit */}
+        <h3 className="text-sm font-semibold text-gray-900 leading-tight mb-1 line-clamp-2 min-h-[2.5em]">
+            {product.name}
+        </h3>
+        <p className="text-xs text-gray-500 mb-2">{product.unit || '1 unit'}</p>
+        
+        {/* Bulk Deal Badge */}
+        {product.bulkRule && (
+             <div className="mb-3 inline-flex items-center gap-1 bg-yellow-50 border border-yellow-100 px-2 py-1 rounded text-[10px] font-bold text-yellow-700">
+                <Tag size={10} />
+                Buy {product.bulkRule.qty} for Rs. {product.bulkRule.price}
+             </div>
+        )}
+
+        {/* Price & Button Container - Pushed to bottom */}
+        <div className="mt-auto flex items-center justify-between gap-2 h-9">
+            <div className="flex flex-col leading-none">
+                <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-gray-900">
+                        Rs. {product.price.toFixed(2)}
+                    </span>
+                    {product.originalPrice && (
+                        <span className="text-xs text-gray-400 line-through">
+                            Rs. {product.originalPrice.toFixed(2)}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="relative z-10">
+                {qty > 0 ? (
+                     <div className="flex items-center bg-green-600 rounded-lg shadow-sm h-8">
+                         <button 
+                            onClick={handleDecrement}
+                            className="w-8 h-full flex items-center justify-center text-white hover:bg-green-700 rounded-l-lg transition-colors"
+                         >
+                             <Minus size={14} />
+                         </button>
+                         <span className="w-6 font-bold text-white text-xs text-center">{qty}</span>
+                         <button 
+                            onClick={handleIncrement}
+                            disabled={product.stock <= qty}
+                            className={`w-8 h-full flex items-center justify-center text-white rounded-r-lg transition-colors ${
+                                product.stock <= qty ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'
+                            }`}
+                         >
+                             <Plus size={14} />
+                         </button>
+                     </div>
+                ) : (
+                    <button 
+                        onClick={handleAdd}
+                        disabled={product.stock === 0}
+                        className={`
+                            px-6 h-8 rounded-lg font-bold text-xs uppercase tracking-wide transition-all border
+                            ${product.stock === 0 
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'bg-green-50 text-green-700 border-green-200 shadow-sm hover:bg-green-600 hover:text-white hover:border-green-600 active:scale-95'
+                            }
+                        `}
+                    >
+                        ADD
+                    </button>
+                )}
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProductCard;
