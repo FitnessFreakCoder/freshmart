@@ -22,7 +22,11 @@ const MOCK_COUPONS: Coupon[] = [
 // Simulation of Local Storage Persistence
 const load = <T,>(key: string, def: T): T => {
   const s = localStorage.getItem(key);
-  return s ? JSON.parse(s) : def;
+  try {
+      return s ? JSON.parse(s) : def;
+  } catch(e) {
+      return def;
+  }
 };
 
 const save = (key: string, data: any) => {
@@ -33,21 +37,24 @@ export const mockApi = {
   login: async (identifier: string, password: string): Promise<User> => {
     await new Promise(r => setTimeout(r, 800)); // Latency
     
-    // Check hardcoded admin (Allow login via email or 'admin' username)
-    if ((identifier === 'admin@freshmart.com' || identifier === 'admin') && password === 'admin') {
-      return { id: 1, username: 'Admin User', email: 'admin@freshmart.com', role: UserRole.ADMIN, token: 'mock_admin_jwt' };
-    }
-
-    // Check registered users
-    const users = load<User[]>('users', []);
-    // Check if identifier matches email OR username
+    // 1. Check Registered Users (Local Storage) FIRST to allow password overrides
+    const users = load<any[]>('users', []);
     const foundUser = users.find((u: any) => (u.email === identifier || u.username === identifier) && u.password === password);
     
     if (foundUser) {
-        return { ...foundUser, token: 'mock_user_jwt' };
+        return { ...foundUser, token: 'mock_jwt_' + Date.now() };
     }
 
-    // Default demo user
+    // 2. Check Hardcoded Defaults (Only if not found in LS)
+    // Updated Admin Credentials
+    if (identifier === 'SidasAdmin' && password === 'S!dd@17082003') {
+      return { id: 1, username: 'SidasAdmin', email: 'admin@freshmart.com', role: UserRole.ADMIN, token: 'mock_admin_jwt' };
+    }
+
+    if (identifier === 'role' && password === 'role123') {
+       return { id: 3, username: 'Store Manager', email: 'staff@freshmart.com', role: UserRole.STAFF, token: 'mock_staff_jwt' };
+    }
+
     if ((identifier === 'user@freshmart.com' || identifier === 'user') && password === 'user') {
       return { id: 2, username: 'John Doe', email: 'user@freshmart.com', role: UserRole.USER, token: 'mock_user_jwt' };
     }
@@ -77,59 +84,111 @@ export const mockApi = {
     return { ...newUser, token: 'mock_jwt_' + Date.now() };
   },
 
+  resetPassword: async (identifier: string, newPassword: string): Promise<void> => {
+      await new Promise(r => setTimeout(r, 800));
+      const users = load<any[]>('users', []);
+      const userIdx = users.findIndex(u => u.email === identifier || u.username === identifier);
+
+      // If user exists in DB, update password
+      if (userIdx !== -1) {
+          users[userIdx].password = newPassword;
+          save('users', users);
+          return;
+      }
+
+      // If user is one of the hardcoded ones but not in DB yet, create an override entry
+      // Updated to check EMAIL as well for hardcoded users
+      if (identifier === 'role' || identifier === 'staff@freshmart.com') {
+          const staffOverride = {
+              id: 3, 
+              username: 'role', 
+              email: 'staff@freshmart.com', 
+              password: newPassword,
+              role: UserRole.STAFF
+          };
+          users.push(staffOverride);
+          save('users', users);
+          return;
+      }
+
+      // Updated Admin Override check
+      if (identifier === 'SidasAdmin' || identifier === 'admin@freshmart.com') {
+          const adminOverride = {
+              id: 1, 
+              username: 'SidasAdmin', 
+              email: 'admin@freshmart.com', 
+              password: newPassword,
+              role: UserRole.ADMIN
+          };
+          users.push(adminOverride);
+          save('users', users);
+          return;
+      }
+
+       if (identifier === 'user' || identifier === 'user@freshmart.com') {
+          const userOverride = {
+              id: 2, 
+              username: 'user', 
+              email: 'user@freshmart.com', 
+              password: newPassword,
+              role: UserRole.USER
+          };
+          users.push(userOverride);
+          save('users', users);
+          return;
+      }
+
+      throw new Error('User not found');
+  },
+
   getProducts: async (): Promise<Product[]> => {
-    return load('products', MOCK_PRODUCTS);
+    return load<Product[]>('products', MOCK_PRODUCTS);
   },
 
   saveProduct: async (product: Product): Promise<Product> => {
-    const products = load('products', MOCK_PRODUCTS);
+    const products = load<Product[]>('products', MOCK_PRODUCTS);
+    
     if (product.id === 0) {
         product.id = Date.now();
         products.push(product);
     } else {
-        const idx = products.findIndex(p => p.id === product.id);
-        if (idx !== -1) products[idx] = product;
+        const idx = products.findIndex(p => String(p.id) === String(product.id));
+        if (idx !== -1) {
+            products[idx] = product;
+        } else {
+            products.push(product);
+        }
     }
     save('products', products);
     return product;
   },
 
-  deleteProduct: async (id: number): Promise<void> => {
-      let products = load('products', MOCK_PRODUCTS);
-      const initialLength = products.length;
-      products = products.filter(p => p.id !== id);
-      
-      // Safety check to ensure we actually deleted something
-      if (products.length === initialLength) {
-          console.warn(`Product with ID ${id} not found in mock store`);
-      }
-      
-      save('products', products);
+  deleteProduct: async (id: number | string): Promise<void> => {
+      let products = load<Product[]>('products', MOCK_PRODUCTS);
+      const newProducts = products.filter(p => String(p.id) !== String(id));
+      save('products', newProducts);
   },
 
   getOrders: async (userId?: number): Promise<Order[]> => {
     const orders = load<Order[]>('orders', []);
     const users = load<any[]>('users', []);
 
-    // Helper to find username for an order
     const getUsername = (uid: number) => {
         if (uid === 1) return 'Admin User';
         if (uid === 2) return 'John Doe';
+        if (uid === 3) return 'Store Manager';
         const u = users.find(user => user.id === uid);
         return u ? u.username : 'Unknown User';
     };
 
-    // Attach username to each order
     const enrichedOrders = orders.map(o => ({
         ...o,
         username: getUsername(o.userId)
     }));
 
     if (userId) {
-        // Filter orders for specific user
         return enrichedOrders.filter(o => o.userId === userId);
     }
-    // Return all orders (for Admin)
     return enrichedOrders;
   },
 
@@ -138,12 +197,10 @@ export const mockApi = {
     orders.unshift(order);
     save('orders', orders);
 
-    // Update user profile with mobile number if available
     if (order.userId && order.mobileNumber) {
         const users = load<User[]>('users', []);
         const userIdx = users.findIndex(u => u.id === order.userId);
         if (userIdx !== -1) {
-            // Store just the 10 digits
             const rawMobile = order.mobileNumber.replace('+977-', '');
             users[userIdx] = { ...users[userIdx], mobileNumber: rawMobile };
             save('users', users);
@@ -162,37 +219,50 @@ export const mockApi = {
     }
   },
 
-  // Coupons
   getCoupons: async (): Promise<Coupon[]> => {
-      return load('coupons', MOCK_COUPONS);
+      return load<Coupon[]>('coupons', MOCK_COUPONS);
   },
 
   createCoupon: async (coupon: Coupon): Promise<void> => {
-      const coupons = load('coupons', MOCK_COUPONS);
+      const coupons = load<Coupon[]>('coupons', MOCK_COUPONS);
       coupons.push(coupon);
       save('coupons', coupons);
   },
 
+  // NEW: Update Coupon Logic
+  updateCoupon: async (originalCode: string, updatedCoupon: Coupon): Promise<void> => {
+      let coupons = load<Coupon[]>('coupons', MOCK_COUPONS);
+      const index = coupons.findIndex(c => c.code === originalCode);
+      if (index !== -1) {
+          // Check if changing code results in duplicate
+          if (updatedCoupon.code !== originalCode && coupons.find(c => c.code === updatedCoupon.code)) {
+               throw new Error("Coupon code already exists");
+          }
+          coupons[index] = updatedCoupon;
+          save('coupons', coupons);
+      } else {
+          throw new Error("Coupon not found");
+      }
+  },
+
   deleteCoupon: async (code: string): Promise<void> => {
-      let coupons = load('coupons', MOCK_COUPONS);
+      let coupons = load<Coupon[]>('coupons', MOCK_COUPONS);
       coupons = coupons.filter(c => c.code !== code);
       save('coupons', coupons);
   },
 
   validateCoupon: async (code: string, orderTotal: number = 0): Promise<{ isValid: boolean, coupon?: Coupon, error?: string }> => {
-    const coupons = load('coupons', MOCK_COUPONS);
+    const coupons = load<Coupon[]>('coupons', MOCK_COUPONS);
     const found = coupons.find(c => c.code === code);
     
     if (!found) {
         return { isValid: false, error: 'Invalid coupon code' };
     }
     
-    // Check expiry
     if (new Date(found.expiry) < new Date()) {
         return { isValid: false, error: 'Coupon expired' };
     }
 
-    // Check Min Order Amount
     if (found.minOrderAmount && orderTotal < found.minOrderAmount) {
         return { 
             isValid: false, 
@@ -203,11 +273,8 @@ export const mockApi = {
     return { isValid: true, coupon: found };
   },
 
-  // Mock Google Geocoding
   reverseGeocode: async (lat: number, lng: number): Promise<string> => {
     await new Promise(r => setTimeout(r, 500));
-    // We return a string that includes the lat/lng to prove we used them, 
-    // but we can't do real reverse geocoding without a paid API key in this demo environment.
     return `Detected Location (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
   }
 };

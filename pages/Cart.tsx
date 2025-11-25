@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Minus, Plus, Trash2, Sparkles, ChefHat, ArrowLeft, X } from 'lucide-react';
+import { Minus, Plus, Trash2, Sparkles, ChefHat, ArrowLeft, X, Truck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../services/apiService';
+import { mockApi } from '../services/mockBackend';
 import { generateRecipe } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 
@@ -18,8 +18,8 @@ const Cart: React.FC = () => {
   const [loadingRecipe, setLoadingRecipe] = useState(false);
   const [autoApplied, setAutoApplied] = useState(false);
 
-  // Calculations
-  const { subtotal, bulkDiscount, total } = useMemo(() => {
+  // Calculations with Delivery Charge
+  const { subtotal, bulkDiscount, total, deliveryCharge } = useMemo(() => {
     let sub = 0;
     let bDisc = 0;
 
@@ -34,40 +34,54 @@ const Cart: React.FC = () => {
       }
     });
 
-    return { subtotal: sub, bulkDiscount: bDisc, total: sub - bDisc - appliedCoupon };
+    const netAmount = sub - bDisc;
+    
+    // Delivery Logic
+    let dCharge = 0;
+    if (netAmount > 3000) {
+        dCharge = 0;
+    } else if (netAmount >= 1000) {
+        dCharge = 25;
+    } else {
+        dCharge = 50;
+    }
+
+    return { 
+        subtotal: sub, 
+        bulkDiscount: bDisc, 
+        deliveryCharge: dCharge,
+        total: netAmount - appliedCoupon + dCharge 
+    };
   }, [state.cart, appliedCoupon]);
 
   // Auto-Apply Logic for Orders > 2000
   useEffect(() => {
-    // If no coupon is manually applied, and total > 2000, apply the generic discount
     const checkAutoApply = async () => {
+      // NOTE: We check subtotal (before discounts) or net total? Usually subtotal for coupon eligibility.
       if (subtotal >= 2000 && !appliedCouponCode) {
-        const coupons = await api.getCoupons();
-        const autoCoupon = coupons.find(c => c.code === 'AUTO50');
-        if (autoCoupon && subtotal >= autoCoupon.minOrderAmount) {
-          setAppliedCoupon(autoCoupon.discountAmount);
-          setAppliedCouponCode('AUTO50');
-          setAutoApplied(true);
-        }
+         const result = await mockApi.validateCoupon('AUTO50', subtotal);
+         if (result.isValid && result.coupon) {
+             setAppliedCoupon(result.coupon.discountAmount);
+             setAppliedCouponCode('AUTO50');
+             setAutoApplied(true);
+         }
       }
-      // If user drops below 2000 and it was auto-applied, remove it
       if (subtotal < 2000 && autoApplied) {
-        setAppliedCoupon(0);
-        setAppliedCouponCode('');
-        setAutoApplied(false);
+          setAppliedCoupon(0);
+          setAppliedCouponCode('');
+          setAutoApplied(false);
       }
     };
     checkAutoApply();
   }, [subtotal, appliedCouponCode, autoApplied]);
 
   const handleApplyCoupon = async () => {
-    const coupons = await api.getCoupons();
-    const coupon = coupons.find(c => c.code === couponCode);
-    if (coupon && subtotal >= coupon.minOrderAmount) {
-      setAppliedCoupon(coupon.discountAmount);
-      setAppliedCouponCode(coupon.code);
+    const result = await mockApi.validateCoupon(couponCode, subtotal);
+    if (result.isValid && result.coupon) {
+      setAppliedCoupon(result.coupon.discountAmount);
+      setAppliedCouponCode(result.coupon.code);
       setCouponError('');
-      setAutoApplied(false); // Manual override
+      setAutoApplied(false);
       setCouponCode('');
     } else {
       setCouponError(result.error || 'Invalid coupon');
@@ -120,7 +134,9 @@ const Cart: React.FC = () => {
         <div className="lg:col-span-8">
           <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
             <ul className="divide-y divide-gray-200">
-              {state.cart.map((item) => (
+              {state.cart.map((item) => {
+                const isMaxStock = item.quantity >= item.stock;
+                return (
                 <li key={item.id} className="p-6 flex items-center">
                   <img src={item.imageUrl} alt={item.name} className="h-20 w-20 object-cover rounded-md" />
                   <div className="ml-4 flex-1">
@@ -129,6 +145,7 @@ const Cart: React.FC = () => {
                     {item.bulkRule && (
                        <span className="text-xs text-indigo-600 font-semibold">Bulk: Buy {item.bulkRule.qty} for Rs. {item.bulkRule.price}</span>
                     )}
+                    {isMaxStock && <p className="text-xs text-red-500 mt-1 font-medium">Available stock: {item.stock}</p>}
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center border border-gray-300 rounded-lg">
@@ -140,8 +157,13 @@ const Cart: React.FC = () => {
                       </button>
                       <span className="px-4 font-medium">{item.quantity}</span>
                       <button 
-                         onClick={() => dispatch({ type: 'UPDATE_CART_QTY', payload: { id: item.id, qty: item.quantity + 1 } })}
-                         className="p-2 hover:bg-gray-100"
+                         onClick={() => {
+                             if (!isMaxStock) {
+                                dispatch({ type: 'UPDATE_CART_QTY', payload: { id: item.id, qty: item.quantity + 1 } });
+                             }
+                         }}
+                         disabled={isMaxStock}
+                         className={`p-2 ${isMaxStock ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'}`}
                       >
                         <Plus size={16} />
                       </button>
@@ -154,7 +176,7 @@ const Cart: React.FC = () => {
                     </button>
                   </div>
                 </li>
-              ))}
+              )})}
             </ul>
           </div>
           
@@ -192,6 +214,17 @@ const Cart: React.FC = () => {
         <div className="lg:col-span-4 mt-8 lg:mt-0">
           <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
+            
+            {/* Delivery Charge Info Box */}
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-sm text-blue-800 mb-4">
+               <p className="font-bold flex items-center gap-2 mb-1"><Truck size={16}/> Delivery Policy</p>
+               <ul className="text-xs space-y-1 ml-1">
+                  <li>&lt; Rs. 1000: Rs. 50</li>
+                  <li>Rs. 1000-3000: Rs. 25</li>
+                  <li>&gt; Rs. 3000: <span className="font-bold text-green-600">FREE</span></li>
+               </ul>
+            </div>
+
             <div className="flow-root">
               <dl className="-my-4 text-sm divide-y divide-gray-200">
                 <div className="py-4 flex items-center justify-between">
@@ -205,7 +238,6 @@ const Cart: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Coupon Section */}
                 <div className="py-4">
                    {!appliedCouponCode ? (
                        <div className="flex gap-2 mb-2">
@@ -237,6 +269,13 @@ const Cart: React.FC = () => {
                    
                    {couponError && <p className="text-red-500 text-xs mt-2">{couponError}</p>}
                    {appliedCoupon > 0 && <p className="text-green-600 text-xs mt-1">Discount: -Rs. {appliedCoupon.toFixed(2)}</p>}
+                </div>
+
+                <div className="py-4 flex items-center justify-between">
+                  <dt className="text-gray-600">Delivery Charge</dt>
+                  <dd className={`font-medium ${deliveryCharge === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                    {deliveryCharge === 0 ? 'FREE' : `Rs. ${deliveryCharge.toFixed(2)}`}
+                  </dd>
                 </div>
 
                 <div className="py-4 flex items-center justify-between border-t border-gray-200">

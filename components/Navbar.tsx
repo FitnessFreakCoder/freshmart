@@ -1,20 +1,32 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, User as UserIcon, LogOut, Menu, X, MapPin } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
 const Navbar: React.FC = () => {
-  const { state, dispatch, isAdmin } = useStore();
+  const { state, dispatch, isAdmin, isStaff } = useStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   const cartCount = state.cart.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleLogout = () => {
     dispatch({ type: 'SET_USER', payload: null });
-    window.location.hash = '/login';
+    navigate('/login');
   };
+
+  const handleCartClick = () => {
+    if (!state.user) {
+      alert("Please sign in to view your cart.");
+      navigate('/login');
+      return;
+    }
+    navigate('/cart');
+  };
+
+  const isLoginPage = location.pathname === '/login';
 
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
@@ -52,9 +64,9 @@ const Navbar: React.FC = () => {
                 </Link>
              )}
 
-             {isAdmin && (
+             {(isAdmin || isStaff) && (
                  <Link to="/admin" className="text-gray-700 hover:text-orange-600 font-medium text-sm">
-                    Admin
+                    Dashboard
                  </Link>
              )}
              
@@ -71,10 +83,16 @@ const Navbar: React.FC = () => {
                 </Link>
              )}
 
-             <Link to="/cart" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-                <ShoppingCart className="h-5 w-5" />
-                <span className="font-bold text-sm">{cartCount} items</span>
-             </Link>
+             {/* Hide Cart button if on Login Page */}
+             {!isLoginPage && (
+                 <button 
+                    onClick={handleCartClick}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                 >
+                    <ShoppingCart className="h-5 w-5" />
+                    <span className="font-bold text-sm">{cartCount} items</span>
+                 </button>
+             )}
           </div>
 
           <div className="-mr-2 flex md:hidden">
@@ -92,9 +110,15 @@ const Navbar: React.FC = () => {
         <div className="md:hidden bg-white border-t">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Shop</Link>
-            <Link to="/cart" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Cart ({cartCount})</Link>
+            
+            {!isLoginPage && (
+                <button onClick={handleCartClick} className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">
+                    Cart ({cartCount})
+                </button>
+            )}
+
             {state.user && <Link to="/orders" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Orders</Link>}
-            {isAdmin && <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Admin</Link>}
+            {(isAdmin || isStaff) && <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Dashboard</Link>}
             {!state.user ? (
                <Link to="/login" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Login</Link>
             ) : (

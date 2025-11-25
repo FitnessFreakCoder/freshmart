@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useLocation as useRouteLocation, useNavigate } from 'react-router-dom';
-import { api } from '../services/apiService';
+import { mockApi } from '../services/mockBackend';
 import { Order, OrderStatus } from '../types';
 import { MapPin, Loader, CheckCircle, Edit2, ShoppingBag, Banknote, Phone, X, ArrowLeft } from 'lucide-react';
 
@@ -33,7 +33,7 @@ const Checkout: React.FC = () => {
     }
   }, [state.user]);
 
-  // Recalculate Total
+  // Recalculate Total and Delivery Charge
   let subtotal = 0;
   let bulkDiscount = 0;
   state.cart.forEach(item => {
@@ -46,7 +46,18 @@ const Checkout: React.FC = () => {
         bulkDiscount += (reg - bulk);
       }
   });
-  const finalTotal = subtotal - bulkDiscount - appliedCoupon;
+
+  const netAmount = subtotal - bulkDiscount;
+  let deliveryCharge = 0;
+  if (netAmount > 3000) {
+      deliveryCharge = 0;
+  } else if (netAmount >= 1000) {
+      deliveryCharge = 25;
+  } else {
+      deliveryCharge = 50;
+  }
+
+  const finalTotal = netAmount - appliedCoupon + deliveryCharge;
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -61,8 +72,14 @@ const Checkout: React.FC = () => {
       async (position) => {
         const { latitude, longitude } = position.coords;
         setCoords({ lat: latitude, lng: longitude });
-        // Optionally, use a third-party geocoding API here if needed
-        setLoadingGeo(false);
+        try {
+          const addr = await mockApi.reverseGeocode(latitude, longitude);
+          setAddress(addr);
+        } catch (e) {
+          setAddress('Address fetch failed. Please enter manually.');
+        } finally {
+          setLoadingGeo(false);
+        }
       },
       (err) => {
         console.error(err);
@@ -109,6 +126,7 @@ const Checkout: React.FC = () => {
       items: [...state.cart],
       total: subtotal,
       discount: bulkDiscount + appliedCoupon,
+      deliveryCharge: deliveryCharge, // Include in order
       finalTotal: Math.max(0, finalTotal),
       status: OrderStatus.PENDING,
       location: {
@@ -119,9 +137,9 @@ const Checkout: React.FC = () => {
       createdAt: new Date().toISOString()
     };
 
-    const token = localStorage.getItem('token');
-    const placedOrder = await api.placeOrder(newOrder, token);
-    dispatch({ type: 'PLACE_ORDER', payload: placedOrder });
+    await mockApi.placeOrder(newOrder);
+    dispatch({ type: 'PLACE_ORDER', payload: newOrder });
+    
     // Persist user mobile locally in state so it shows up next time
     dispatch({ type: 'UPDATE_USER_MOBILE', payload: mobile });
 
@@ -346,6 +364,10 @@ const Checkout: React.FC = () => {
          <div className="flex justify-between mb-2 text-sm text-green-600">
             <span>Discounts</span>
             <span>-Rs. {(bulkDiscount + appliedCoupon).toFixed(2)}</span>
+         </div>
+         <div className="flex justify-between mb-2 text-sm text-gray-600">
+            <span>Delivery Charge</span>
+            <span>{deliveryCharge === 0 ? <span className="text-green-600 font-bold">FREE</span> : `Rs. ${deliveryCharge.toFixed(2)}`}</span>
          </div>
          <div className="flex justify-between mt-4 pt-4 border-t font-bold text-xl text-gray-900">
             <span>Total To Pay</span>

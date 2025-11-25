@@ -2,10 +2,10 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import ProductCard from '../components/ProductCard';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, Truck } from 'lucide-react';
 
 const Home: React.FC = () => {
-    const { state } = useStore();
+  const { state } = useStore();
   const [search, setSearch] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState('All');
 
@@ -38,34 +38,59 @@ const Home: React.FC = () => {
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
         
-        {/* Sidebar - Sticky Categories */}
-        <aside className="w-full md:w-64 flex-shrink-0 sticky top-24 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 bg-gray-50">
-                <h2 className="font-bold text-gray-700">Categories</h2>
+        {/* Sidebar */}
+        <aside className="w-full md:w-64 flex-shrink-0 sticky top-24 space-y-6">
+            {/* Categories */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                    <h2 className="font-bold text-gray-700">Categories</h2>
+                </div>
+                <ul className="divide-y divide-gray-100">
+                    {categories.map(c => (
+                        <li key={c}>
+                            <button
+                                onClick={() => setSelectedCategory(c)}
+                                className={`w-full text-left px-4 py-3 text-sm font-medium flex justify-between items-center transition-colors hover:bg-gray-50 ${
+                                    selectedCategory === c 
+                                        ? 'text-green-600 bg-green-50 border-l-4 border-green-600' 
+                                        : 'text-gray-600 border-l-4 border-transparent'
+                                }`}
+                            >
+                                {c}
+                                {selectedCategory === c && <ChevronRight size={16} />}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
             </div>
-            <ul className="divide-y divide-gray-100">
-                {categories.map(c => (
-                    <li key={c}>
-                        <button
-                            onClick={() => setSelectedCategory(c)}
-                            className={`w-full text-left px-4 py-3 text-sm font-medium flex justify-between items-center transition-colors hover:bg-gray-50 ${
-                                selectedCategory === c 
-                                    ? 'text-green-600 bg-green-50 border-l-4 border-green-600' 
-                                    : 'text-gray-600 border-l-4 border-transparent'
-                            }`}
-                        >
-                            {c}
-                            {selectedCategory === c && <ChevronRight size={16} />}
-                        </button>
+
+            {/* Delivery Charges Info Box */}
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-blue-900">
+                <h3 className="font-bold flex items-center gap-2 mb-2">
+                    <Truck size={18} className="text-blue-600" /> 
+                    Delivery Charges
+                </h3>
+                <ul className="space-y-2 text-sm">
+                    <li className="flex justify-between">
+                        <span>Below Rs. 1000</span>
+                        <span className="font-bold">Rs. 50</span>
                     </li>
-                ))}
-            </ul>
+                    <li className="flex justify-between">
+                        <span>Rs. 1000 - 3000</span>
+                        <span className="font-bold">Rs. 25</span>
+                    </li>
+                    <li className="flex justify-between items-center">
+                        <span>Above Rs. 3000</span>
+                        <span className="bg-green-600 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase">Free</span>
+                    </li>
+                </ul>
+            </div>
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 w-full">
             
-            {/* Promo Banner - Only show if not searching */}
+            {/* Promo Banner */}
             {!search && (
                 <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-6 md:p-8 text-white mb-8 shadow-lg relative overflow-hidden">
                     <div className="relative z-10">

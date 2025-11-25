@@ -104,7 +104,11 @@ const Orders = () => {
                          <span>Discount</span>
                          <span>-Rs. {o.discount.toFixed(2)}</span>
                      </div>
-                     <div className="flex justify-between text-lg font-bold text-gray-900 pt-2">
+                     <div className="flex justify-between text-sm text-gray-600">
+                         <span>Delivery Charge</span>
+                         <span>{o.deliveryCharge > 0 ? `Rs. ${o.deliveryCharge.toFixed(2)}` : 'FREE'}</span>
+                     </div>
+                     <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t mt-2">
                          <span>Total Paid</span>
                          <span>Rs. {o.finalTotal.toFixed(2)}</span>
                      </div>

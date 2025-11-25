@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Product } from '../types';
 import { Plus, Minus, Clock, Tag } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   product: Product;
@@ -10,18 +11,34 @@ interface Props {
 
 const ProductCard: React.FC<Props> = ({ product }) => {
   const { state, dispatch } = useStore();
+  const navigate = useNavigate();
   
   // Get current quantity in cart
   const cartItem = state.cart.find(i => i.id === product.id);
   const qty = cartItem ? cartItem.quantity : 0;
+  const isMaxStock = qty >= product.stock;
 
   const handleAdd = () => {
-    dispatch({ type: 'ADD_TO_CART', payload: product });
+    if (!state.user) {
+        alert("Please sign in to add items to your cart.");
+        navigate('/login');
+        return;
+    }
+    if (product.stock > 0) {
+      dispatch({ type: 'ADD_TO_CART', payload: product });
+    }
   };
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatch({ type: 'ADD_TO_CART', payload: product });
+    if (!state.user) {
+        alert("Please sign in to add items to your cart.");
+        navigate('/login');
+        return;
+    }
+    if (!isMaxStock) {
+       dispatch({ type: 'ADD_TO_CART', payload: product });
+    }
   };
 
   const handleDecrement = (e: React.MouseEvent) => {
@@ -98,7 +115,14 @@ const ProductCard: React.FC<Props> = ({ product }) => {
                 </div>
             </div>
 
-            <div className="relative z-10">
+            <div className="relative z-10 flex flex-col items-end">
+                {/* Available Stock Warning */}
+                {isMaxStock && qty > 0 && (
+                     <span className="absolute -top-7 right-0 text-[9px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 whitespace-nowrap z-20 shadow-sm">
+                        Available stock: {product.stock}
+                     </span>
+                )}
+
                 {qty > 0 ? (
                      <div className="flex items-center bg-green-600 rounded-lg shadow-sm h-8">
                          <button 
@@ -110,9 +134,9 @@ const ProductCard: React.FC<Props> = ({ product }) => {
                          <span className="w-6 font-bold text-white text-xs text-center">{qty}</span>
                          <button 
                             onClick={handleIncrement}
-                            disabled={product.stock <= qty}
+                            disabled={isMaxStock}
                             className={`w-8 h-full flex items-center justify-center text-white rounded-r-lg transition-colors ${
-                                product.stock <= qty ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'
+                                isMaxStock ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'hover:bg-green-700'
                             }`}
                          >
                              <Plus size={14} />

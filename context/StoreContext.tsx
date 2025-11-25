@@ -31,15 +31,27 @@ const StoreContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<Action>;
   isAdmin: boolean;
+  isStaff: boolean;
 }>({
   state: initialState,
   dispatch: () => null,
   isAdmin: false,
+  isStaff: false,
 });
 
 const reducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
     case 'SET_USER':
+      // If payload is null (Logout), clear user-specific data like cart and orders
+      if (action.payload === null) {
+        return { 
+          ...state, 
+          user: null, 
+          cart: [], 
+          orders: [], 
+          currentOrder: null 
+        };
+      }
       return { ...state, user: action.payload };
     case 'UPDATE_USER_MOBILE':
       return { 
@@ -98,23 +110,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Initial Load
   useEffect(() => {
     const init = async () => {
-      try {
-        const { api } = await import('../services/apiService');
-        const prods = await api.getProducts();
-        dispatch({ type: 'SET_PRODUCTS', payload: prods });
-        const coupons = await api.getCoupons();
-        dispatch({ type: 'SET_COUPONS', payload: coupons });
-      } catch (err) {
-        console.error('API error:', err);
-      }
+      const prods = await mockApi.getProducts();
+      dispatch({ type: 'SET_PRODUCTS', payload: prods });
+      
+      const coupons = await mockApi.getCoupons();
+      dispatch({ type: 'SET_COUPONS', payload: coupons });
     };
     init();
   }, []);
 
   const isAdmin = state.user?.role === UserRole.ADMIN;
+  const isStaff = state.user?.role === UserRole.STAFF;
 
   return (
-    <StoreContext.Provider value={{ state, dispatch, isAdmin }}>
+    <StoreContext.Provider value={{ state, dispatch, isAdmin, isStaff }}>
       {children}
     </StoreContext.Provider>
   );

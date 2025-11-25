@@ -2,36 +2,47 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { api } from '../services/apiService';
+import { mockApi } from '../services/mockBackend';
 import { Product, Order, OrderStatus, UserRole, Coupon } from '../types';
 import { Edit, Trash, Package, Map, CheckSquare, Tag, Plus, ExternalLink, Database, User as UserIcon, Phone } from 'lucide-react';
 
 const Admin: React.FC = () => {
-  const { state, dispatch, isAdmin } = useStore();
+  const { state, dispatch, isAdmin, isStaff } = useStore();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'coupons'>('products');
+  
+  // Set default tab based on Role (Staff sees Orders by default, Admin sees Products)
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'coupons'>(isAdmin ? 'products' : 'orders');
   
   // Product State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   
   // Coupon State
   const [isAddingCoupon, setIsAddingCoupon] = useState(false);
+  const [editingCouponCode, setEditingCouponCode] = useState<string | null>(null); // Track if editing
   const [newCoupon, setNewCoupon] = useState<Partial<Coupon>>({ code: '', discountAmount: 0, expiry: '', minOrderAmount: 0 });
 
   useEffect(() => {
-    // Basic protection
-    if (state.user && state.user.role !== UserRole.ADMIN) {
+    // Basic protection - Allow if Admin OR Staff
+    if (!state.user || (state.user.role !== UserRole.ADMIN && state.user.role !== UserRole.STAFF)) {
         navigate('/');
     }
   }, [state.user, navigate]);
 
   useEffect(() => {
-      // Refresh Data
+      // If Staff logs in, force active tab to orders if it's set to restricted tabs
+      if (isStaff && activeTab !== 'orders') {
+          setActiveTab('orders');
+      }
+  }, [isStaff, activeTab]);
+
+  useEffect(() => {
+      // Refresh Data on mount
       const refresh = async () => {
-          const token = localStorage.getItem('token');
-          const orders = await api.getOrders(token);
+          const prods = await mockApi.getProducts();
+          dispatch({ type: 'SET_PRODUCTS', payload: prods });
+          const orders = await mockApi.getOrders();
           dispatch({ type: 'SET_ORDERS', payload: orders });
-          const coupons = await api.getCoupons();
+          const coupons = await mockApi.getCoupons();
           dispatch({ type: 'SET_COUPONS', payload: coupons });
       };
       refresh();
@@ -47,87 +58,145 @@ const Admin: React.FC = () => {
         finalProduct.bulkRule = undefined;
     }
 
-    // TODO: Implement product save via backend API
-    // After saving, refresh products
-    const prods = await api.getProducts();
+    await mockApi.saveProduct({ 
+        ...finalProduct, 
+        id: finalProduct.id || 0,
+        imageUrl: finalProduct.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'
+    } as Product);
+
+    // Refresh products after save
+    const prods = await mockApi.getProducts();
     dispatch({ type: 'SET_PRODUCTS', payload: prods });
     setEditingProduct(null);
   };
 
-  const handleProductDelete = async (id: number) => {
+  const handleProductDelete = async (id: number | string) => {
       if(window.confirm("Are you sure you want to delete this product? This action cannot be undone.")) {
         try {
-            // TODO: Implement product delete via backend API
-            const prods = await api.getProducts();
+            await mockApi.deleteProduct(id);
+            
+            // Immediately fetch fresh data to update UI
+            const prods = await mockApi.getProducts();
             dispatch({ type: 'SET_PRODUCTS', payload: prods });
+            
+            // If we were editing this product, close the modal
+            if (editingProduct && String(editingProduct.id) === String(id)) {
+                setEditingProduct(null);
+            }
         } catch (error) {
-            alert("Failed to delete product");
+            console.error("Delete failed:", error);
+            alert("Failed to delete product. Please try again.");
         }
       }
   };
 
-  const handleCreateCoupon = async (e: React.FormEvent) => {
+  // CREATE OR UPDATE COUPON
+  const handleSaveCoupon = async (e: React.FormEvent) => {
       e.preventDefault();
       if(newCoupon.code && newCoupon.discountAmount && newCoupon.expiry) {
-          // TODO: Implement coupon creation via backend API
-          const coupons = await api.getCoupons();
-          dispatch({ type: 'SET_COUPONS', payload: coupons });
-          setIsAddingCoupon(false);
-          setNewCoupon({ code: '', discountAmount: 0, expiry: '', minOrderAmount: 0 });
+          try {
+            if (editingCouponCode) {
+                // Update Existing
+                await mockApi.updateCoupon(editingCouponCode, newCoupon as Coupon);
+            } else {
+                // Create New
+                await mockApi.createCoupon(newCoupon as Coupon);
+            }
+            
+            // Refetch to stay in sync
+            const coupons = await mockApi.getCoupons();
+            dispatch({ type: 'SET_COUPONS', payload: coupons });
+            
+            setIsAddingCoupon(false);
+            setEditingCouponCode(null);
+            setNewCoupon({ code: '', discountAmount: 0, expiry: '', minOrderAmount: 0 });
+          } catch (err: any) {
+              alert(err.message || 'Failed to save coupon');
+          }
       }
+  };
+
+  // PREPARE EDIT MODE
+  const handleEditCoupon = (coupon: Coupon) => {
+      setNewCoupon(coupon);
+      setEditingCouponCode(coupon.code);
+      setIsAddingCoupon(true);
+  };
+
+  const handleCancelCouponEdit = () => {
+      setIsAddingCoupon(false);
+      setEditingCouponCode(null);
+      setNewCoupon({ code: '', discountAmount: 0, expiry: '', minOrderAmount: 0 });
   };
 
   const handleDeleteCoupon = async (code: string) => {
       if (window.confirm("Are you sure you want to delete this coupon?")) {
-          // TODO: Implement coupon delete via backend API
-          const coupons = await api.getCoupons();
+          await mockApi.deleteCoupon(code);
+          
+          // Refetch data from backend to ensure state is synchronized
+          const coupons = await mockApi.getCoupons();
           dispatch({ type: 'SET_COUPONS', payload: coupons });
+
+          // If we were editing this coupon, close the form
+          if (editingCouponCode === code) {
+            handleCancelCouponEdit();
+          }
       }
   };
 
   const updateStatus = async (id: string, status: OrderStatus) => {
-    // TODO: Implement order status update via backend API
-    dispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id, status } });
+      await mockApi.updateOrderStatus(id, status);
+      dispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id, status } });
   };
 
-  if (!state.user || !isAdmin) return <div className="p-8 text-center text-red-500 font-bold">Access Denied</div>;
+  if (!state.user || (!isAdmin && !isStaff)) return <div className="p-8 text-center text-red-500 font-bold">Access Denied</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
          <div>
-             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-             <p className="text-sm text-gray-500">Manage your inventory, orders, and discounts</p>
+             <h1 className="text-3xl font-bold text-gray-900">
+                 {isAdmin ? 'Admin Dashboard' : 'Staff Dashboard'}
+             </h1>
+             <p className="text-sm text-gray-500">
+                 {isAdmin ? 'Manage your inventory, orders, and discounts' : 'Manage and update order status'}
+             </p>
          </div>
          
          <div className="flex items-center gap-4">
-             <Link to="/backend-guide" className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 shadow-sm text-sm font-medium">
-                 <Database size={16} /> View Database & Backend Code
-             </Link>
+             {isAdmin && (
+                <Link to="/backend-guide" className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 shadow-sm text-sm font-medium">
+                    <Database size={16} /> View Database & Backend Code
+                </Link>
+             )}
              <div className="flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
-                <button 
-                onClick={() => setActiveTab('products')} 
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-indigo-600'}`}
-                >
-                    Products
-                </button>
+                {isAdmin && (
+                    <button 
+                    onClick={() => setActiveTab('products')} 
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-indigo-600'}`}
+                    >
+                        Products
+                    </button>
+                )}
                 <button 
                 onClick={() => setActiveTab('orders')} 
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-indigo-600'}`}
                 >
                     Orders
                 </button>
-                <button 
-                onClick={() => setActiveTab('coupons')} 
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'coupons' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-indigo-600'}`}
-                >
-                    Coupons
-                </button>
+                {isAdmin && (
+                    <button 
+                    onClick={() => setActiveTab('coupons')} 
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'coupons' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-indigo-600'}`}
+                    >
+                        Coupons
+                    </button>
+                )}
             </div>
          </div>
       </div>
 
-      {activeTab === 'products' && (
+      {activeTab === 'products' && isAdmin && (
         <div className="space-y-6">
             <div className="flex justify-end">
                 <button 
@@ -317,12 +386,14 @@ const Admin: React.FC = () => {
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); setEditingProduct(p); }} 
                                         className="text-indigo-600 hover:text-indigo-900 mr-4 p-2"
+                                        title="Edit"
                                     >
                                         <Edit size={16} />
                                     </button>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); handleProductDelete(p.id); }} 
                                         className="text-red-600 hover:text-red-900 p-2"
+                                        title="Delete"
                                     >
                                         <Trash size={16} />
                                     </button>
@@ -335,12 +406,16 @@ const Admin: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'coupons' && (
+      {activeTab === 'coupons' && isAdmin && (
           <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-800">Active Coupons</h2>
                 <button 
-                   onClick={() => setIsAddingCoupon(true)}
+                   onClick={() => {
+                       setIsAddingCoupon(true);
+                       setEditingCouponCode(null);
+                       setNewCoupon({ code: '', discountAmount: 0, expiry: '', minOrderAmount: 0 });
+                   }}
                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm"
                 >
                     <Plus size={18} /> Create Coupon
@@ -349,8 +424,10 @@ const Admin: React.FC = () => {
 
             {isAddingCoupon && (
                 <div className="bg-indigo-50 p-6 rounded-lg mb-8 border border-indigo-100">
-                    <h3 className="text-lg font-bold text-indigo-900 mb-4">Create New Discount</h3>
-                    <form onSubmit={handleCreateCoupon} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <h3 className="text-lg font-bold text-indigo-900 mb-4">
+                        {editingCouponCode ? 'Edit Coupon' : 'Create New Discount'}
+                    </h3>
+                    <form onSubmit={handleSaveCoupon} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                         <div>
                             <label className="block text-xs font-semibold text-indigo-800 mb-1">Code</label>
                             <input 
@@ -393,7 +470,7 @@ const Admin: React.FC = () => {
                             />
                         </div>
                         <div className="flex gap-2">
-                             <button type="button" onClick={() => setIsAddingCoupon(false)} className="px-4 py-2 text-indigo-600 hover:bg-indigo-100 rounded">Cancel</button>
+                             <button type="button" onClick={handleCancelCouponEdit} className="px-4 py-2 text-indigo-600 hover:bg-indigo-100 rounded">Cancel</button>
                              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex-1">Save</button>
                         </div>
                     </form>
@@ -420,13 +497,22 @@ const Admin: React.FC = () => {
                                  <span className="block text-2xl font-bold text-green-600">-Rs.{coupon.discountAmount}</span>
                                  <span className="text-xs text-gray-400">OFF</span>
                              </div>
-                             <button 
-                                onClick={() => handleDeleteCoupon(coupon.code)}
-                                className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition mt-2"
-                                title="Delete Coupon"
-                             >
-                                <Trash size={16} />
-                             </button>
+                             <div className="flex items-center gap-1 mt-2">
+                                 <button 
+                                    onClick={() => handleEditCoupon(coupon)}
+                                    className="text-indigo-400 hover:text-indigo-600 p-1 rounded-full hover:bg-indigo-50 transition"
+                                    title="Edit Coupon"
+                                 >
+                                    <Edit size={16} />
+                                 </button>
+                                 <button 
+                                    onClick={() => handleDeleteCoupon(coupon.code)}
+                                    className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition"
+                                    title="Delete Coupon"
+                                 >
+                                    <Trash size={16} />
+                                 </button>
+                             </div>
                         </div>
                     </div>
                 ))}
@@ -434,8 +520,21 @@ const Admin: React.FC = () => {
           </div>
       )}
 
-      {activeTab === 'orders' && (
+      {activeTab === 'orders' && (isAdmin || isStaff) && (
         <div className="space-y-6">
+            {/* Added Total Orders Statistic Card */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-100 flex items-center gap-4">
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-full">
+                        <Package size={24} />
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-500 font-medium">Total Orders</p>
+                        <h3 className="text-2xl font-bold text-gray-900">{state.orders.length}</h3>
+                    </div>
+                </div>
+            </div>
+
             {state.orders.map(order => (
                 <div key={order.id} className="bg-white rounded-xl shadow p-6 border border-gray-100">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4 border-b pb-4">
@@ -497,6 +596,10 @@ const Admin: React.FC = () => {
                                  <div className="flex justify-between text-sm text-green-600">
                                      <span>Discount</span>
                                      <span>-Rs. {order.discount.toFixed(2)}</span>
+                                 </div>
+                                 <div className="flex justify-between text-sm text-gray-600">
+                                     <span>Delivery</span>
+                                     <span>{order.deliveryCharge && order.deliveryCharge > 0 ? `Rs. ${order.deliveryCharge}` : 'Free'}</span>
                                  </div>
                                  <div className="flex justify-between font-bold text-gray-900 pt-2">
                                      <span>Final Total</span>

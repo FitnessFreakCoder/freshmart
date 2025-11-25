@@ -1,7 +1,8 @@
 
 export enum UserRole {
   USER = 'USER',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',
+  STAFF = 'STAFF'
 }
 
 export interface User {
@@ -58,8 +59,9 @@ export interface Order {
   username?: string; // Added for display purposes
   mobileNumber?: string; // Added for contact
   items: CartItem[];
-  total: number;
+  total: number; // Subtotal
   discount: number;
+  deliveryCharge: number; // Added delivery fee
   finalTotal: number;
   status: OrderStatus;
   location: LocationData;
