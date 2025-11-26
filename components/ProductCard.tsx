@@ -52,13 +52,13 @@ const ProductCard: React.FC<Props> = ({ product }) => {
     : 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 flex flex-col h-full group relative">
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 flex flex-col h-full group relative">
       {/* Image Area */}
-      <div className="h-40 relative bg-gray-50 flex justify-center items-center overflow-hidden">
+      <div className="h-44 relative bg-white p-4 flex justify-center items-center overflow-hidden border-b border-gray-50">
         <img 
           src={product.imageUrl} 
           alt={product.name} 
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
         />
         
         {/* Discount Badge */}
@@ -87,29 +87,35 @@ const ProductCard: React.FC<Props> = ({ product }) => {
         </div>
 
         {/* Title & Unit */}
-        <h3 className="text-sm font-semibold text-gray-900 leading-tight mb-1 line-clamp-2 min-h-[2.5em]">
+        {/* Fixed height (h-10) for title ensures alignment across grid even with varying title lengths */}
+        <h3 className="text-sm font-semibold text-gray-900 leading-tight mb-1 line-clamp-2 h-10" title={product.name}>
             {product.name}
         </h3>
-        <p className="text-xs text-gray-500 mb-2">{product.unit || '1 unit'}</p>
+        <p className="text-xs text-gray-500 mb-2 truncate">{product.unit || '1 unit'}</p>
         
         {/* Bulk Deal Badge */}
-        {product.bulkRule && (
-             <div className="mb-3 inline-flex items-center gap-1 bg-yellow-50 border border-yellow-100 px-2 py-1 rounded text-[10px] font-bold text-yellow-700">
-                <Tag size={10} />
-                Buy {product.bulkRule.qty} for Rs. {product.bulkRule.price}
-             </div>
-        )}
+        <div className="min-h-[24px] mb-2">
+            {product.bulkRule ? (
+                 <div className="inline-flex items-center gap-1 bg-yellow-50 border border-yellow-100 px-2 py-1 rounded text-[10px] font-bold text-yellow-700 w-full truncate">
+                    <Tag size={10} className="flex-shrink-0" />
+                    <span className="truncate">Buy {product.bulkRule.qty} for Rs. {product.bulkRule.price}</span>
+                 </div>
+            ) : (
+                // Spacer to keep buttons aligned if no bulk rule
+                <div className="h-[24px]"></div>
+            )}
+        </div>
 
         {/* Price & Button Container - Pushed to bottom */}
         <div className="mt-auto flex items-center justify-between gap-2 h-9">
             <div className="flex flex-col leading-none">
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-baseline gap-1.5">
                     <span className="text-sm font-bold text-gray-900">
-                        Rs. {product.price.toFixed(2)}
+                        Rs. {product.price.toFixed(0)}
                     </span>
                     {product.originalPrice && (
                         <span className="text-xs text-gray-400 line-through">
-                            Rs. {product.originalPrice.toFixed(2)}
+                            Rs. {product.originalPrice.toFixed(0)}
                         </span>
                     )}
                 </div>
@@ -119,7 +125,7 @@ const ProductCard: React.FC<Props> = ({ product }) => {
                 {/* Available Stock Warning */}
                 {isMaxStock && qty > 0 && (
                      <span className="absolute -top-7 right-0 text-[9px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 whitespace-nowrap z-20 shadow-sm">
-                        Available stock: {product.stock}
+                        Only {product.stock} left
                      </span>
                 )}
 

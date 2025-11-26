@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { mockApi } from '../services/mockBackend';
 import { Product, Order, OrderStatus, UserRole, Coupon } from '../types';
-import { Edit, Trash, Package, Map, CheckSquare, Tag, Plus, ExternalLink, Database, User as UserIcon, Phone } from 'lucide-react';
+import { Edit, Trash, Package, Map, CheckSquare, Tag, Plus, ExternalLink, Database, User as UserIcon, Phone, Upload, X, Image as ImageIcon } from 'lucide-react';
 
 const Admin: React.FC = () => {
   const { state, dispatch, isAdmin, isStaff } = useStore();
@@ -68,6 +68,23 @@ const Admin: React.FC = () => {
     const prods = await mockApi.getProducts();
     dispatch({ type: 'SET_PRODUCTS', payload: prods });
     setEditingProduct(null);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file && editingProduct) {
+          // Validation: Check size (mock backend uses local storage which has small limits)
+          if (file.size > 800 * 1024) { // 800KB limit
+              alert("For this demo, please use images smaller than 800KB.");
+              return;
+          }
+
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setEditingProduct({ ...editingProduct, imageUrl: reader.result as string });
+          };
+          reader.readAsDataURL(file);
+      }
   };
 
   const handleProductDelete = async (id: number | string) => {
@@ -211,7 +228,13 @@ const Admin: React.FC = () => {
             {editingProduct && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white p-6 rounded-xl w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h2 className="text-xl font-bold mb-4">{editingProduct.id ? 'Edit' : 'Add'} Product</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">{editingProduct.id ? 'Edit' : 'Add'} Product</h2>
+                            <button onClick={() => setEditingProduct(null)} className="text-gray-500 hover:text-gray-700">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
                         <form onSubmit={handleProductSave} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-semibold text-gray-600 mb-1">Product Name</label>
@@ -319,14 +342,40 @@ const Admin: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Mock Multer Input */}
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                                <label className="block text-sm font-medium text-gray-700 cursor-pointer">
-                                    <span className="text-indigo-600 hover:text-indigo-500">Upload an image</span>
-                                    <input type="file" className="sr-only"/>
+                            {/* Image Upload Input */}
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50 hover:bg-gray-100 transition-colors relative">
+                                <label className="block cursor-pointer w-full h-full">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <Upload className="text-indigo-500" size={24} />
+                                        <span className="text-sm font-medium text-gray-700">
+                                            Click to Upload Image
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                            (PNG, JPG - Max 800KB)
+                                        </span>
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept="image/*"
+                                        onChange={handleImageUpload}
+                                    />
                                 </label>
-                                <p className="text-xs text-gray-400 mt-1">Admin Only: PNG, JPG, GIF up to 5MB</p>
                             </div>
+
+                            {/* Image Preview */}
+                            {editingProduct.imageUrl && (
+                                <div className="mt-2 flex items-center gap-4 bg-gray-50 p-2 rounded border">
+                                    <img 
+                                        src={editingProduct.imageUrl} 
+                                        alt="Preview" 
+                                        className="h-16 w-16 object-contain rounded bg-white border" 
+                                    />
+                                    <div className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                        <ImageIcon size={14} /> Image Loaded
+                                    </div>
+                                </div>
+                            )}
                             
                             <div className="flex gap-3 justify-end mt-6">
                                 <button type="button" onClick={() => setEditingProduct(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
@@ -337,7 +386,54 @@ const Admin: React.FC = () => {
                 </div>
             )}
 
-            <div className="bg-white rounded-xl shadow overflow-hidden border border-gray-100">
+            {/* Mobile View: Product Cards */}
+            <div className="md:hidden space-y-4">
+                {state.products.map(p => (
+                    <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-start gap-4">
+                        <img className="h-16 w-16 rounded-lg object-cover bg-gray-50" src={p.imageUrl} alt={p.name} />
+                        <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-bold text-gray-900">{p.name}</h3>
+                                    <p className="text-xs text-gray-500">{p.category}</p>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={() => setEditingProduct(p)} 
+                                        className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
+                                        title="Edit"
+                                    >
+                                        <Edit size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleProductDelete(p.id)} 
+                                        className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                                        title="Delete"
+                                    >
+                                        <Trash size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-2 flex items-center justify-between text-sm">
+                                <span className="font-bold text-gray-900">Rs. {p.price.toFixed(2)}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${p.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    Stock: {p.stock}
+                                </span>
+                            </div>
+                            
+                            {p.bulkRule && (
+                                <div className="mt-2 text-xs bg-yellow-50 text-yellow-800 px-2 py-1 rounded inline-block font-medium border border-yellow-100">
+                                    Buy {p.bulkRule.qty} for Rs. {p.bulkRule.price}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Desktop View: Product Table */}
+            <div className="hidden md:block bg-white rounded-xl shadow overflow-hidden border border-gray-100">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>

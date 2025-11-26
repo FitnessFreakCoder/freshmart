@@ -2,15 +2,39 @@
 import { Product, User, UserRole, Order, Coupon, OrderStatus } from '../types';
 
 // Mock Data with NPR Prices
+// Replaced with specific user request: Lifebuoy, Dettol, Basmati Rice
 const MOCK_PRODUCTS: Product[] = [
-  { id: 1, name: 'Organic Bananas', price: 150.00, originalPrice: 180.00, unit: '1 dozen', stock: 100, category: 'Fresh Fruits', imageUrl: 'https://images.unsplash.com/photo-1603833665858-e61c17a86271?auto=format&fit=crop&w=400&q=80', bulkRule: { qty: 2, price: 280.00 } },
-  { id: 2, name: 'Whole Milk', price: 120.00, originalPrice: 130.00, unit: '1 L', stock: 50, category: 'Dairy, Bread & Eggs', imageUrl: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=400&q=80' },
-  { id: 3, name: 'Sourdough Bread', price: 180.00, unit: '1 loaf', stock: 20, category: 'Dairy, Bread & Eggs', imageUrl: 'https://images.unsplash.com/photo-1585478259539-e6215b19066b?auto=format&fit=crop&w=400&q=80' },
-  { id: 4, name: 'Farm Fresh Eggs', price: 20.00, originalPrice: 25.00, unit: '1 pc', stock: 200, category: 'Dairy, Bread & Eggs', imageUrl: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=400&q=80', bulkRule: { qty: 6, price: 100.00 } },
-  { id: 5, name: 'Avocado', price: 350.00, originalPrice: 400.00, unit: '1 pc', stock: 40, category: 'Fresh Fruits', imageUrl: 'https://images.unsplash.com/photo-1523049673856-6468baca2929?auto=format&fit=crop&w=400&q=80' },
-  { id: 6, name: 'Fresh Tomato', price: 60.00, originalPrice: 80.00, unit: '1 kg', stock: 60, category: 'Vegetables', imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=400&q=80' },
-  { id: 7, name: 'Coca Cola', price: 60.00, originalPrice: 65.00, unit: '250 ml', stock: 100, category: 'Cold Drinks', imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=400&q=80' },
-  { id: 8, name: 'Lays Chips', price: 50.00, unit: '1 pack', stock: 80, category: 'Munchies', imageUrl: 'https://images.unsplash.com/photo-1566478919030-261443943943?auto=format&fit=crop&w=400&q=80' },
+  { 
+    id: 1, 
+    name: 'Lifebuoy Soap', 
+    price: 45.00, 
+    originalPrice: 50.00, 
+    unit: '1 bar', 
+    stock: 50, 
+    category: 'Personal Care', 
+    imageUrl: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=400&q=80' 
+  },
+  { 
+    id: 2, 
+    name: 'Dettol Antiseptic Liquid', 
+    price: 100.00, 
+    originalPrice: 110.00, 
+    unit: '1 bottle', 
+    stock: 40, 
+    category: 'Personal Care', 
+    imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80' 
+  },
+  { 
+    id: 3, 
+    name: 'Premium Basmati Rice', 
+    price: 170.00, 
+    originalPrice: 200.00, 
+    unit: '1 kg', 
+    stock: 20, 
+    category: 'Grains & Essentials', 
+    imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=400&q=80',
+    bulkRule: { qty: 5, price: 800.00 } // Example bulk rule for rice
+  },
 ];
 
 const MOCK_COUPONS: Coupon[] = [
@@ -60,6 +84,45 @@ export const mockApi = {
     }
     
     throw new Error('Invalid credentials');
+  },
+
+  // NEW: Simulate Google Login
+  loginWithGoogle: async (): Promise<User> => {
+    await new Promise(r => setTimeout(r, 1200)); // Simulate OAuth popup delay
+
+    // Simulate data returned from Google
+    const googleProfile = {
+        email: 'siddharth@gmail.com', // Mock Google Email
+        name: 'Siddharth', // Name updated as requested
+        picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'
+    };
+
+    const users = load<any[]>('users', []);
+    let user = users.find(u => u.email === googleProfile.email);
+
+    if (!user) {
+        // Create new user from Google Profile if not exists
+        user = {
+            id: Date.now(),
+            username: googleProfile.name,
+            email: googleProfile.email,
+            password: 'GOOGLE_OAUTH_USER', // Placeholder
+            role: UserRole.USER,
+            profilePicture: googleProfile.picture
+        };
+        users.push(user);
+        save('users', users);
+    } else {
+        // Update profile picture and username if existing user logs in with Google
+        user.profilePicture = googleProfile.picture;
+        user.username = googleProfile.name; // Ensure username matches Google name
+        // Update user in array
+        const idx = users.findIndex(u => u.id === user.id);
+        users[idx] = user;
+        save('users', users);
+    }
+
+    return { ...user, token: 'mock_google_token_' + Date.now() };
   },
 
   register: async (username: string, email: string, password: string): Promise<User> => {
@@ -229,7 +292,6 @@ export const mockApi = {
       save('coupons', coupons);
   },
 
-  // NEW: Update Coupon Logic
   updateCoupon: async (originalCode: string, updatedCoupon: Coupon): Promise<void> => {
       let coupons = load<Coupon[]>('coupons', MOCK_COUPONS);
       const index = coupons.findIndex(c => c.code === originalCode);

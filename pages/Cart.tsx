@@ -148,14 +148,15 @@ const Cart: React.FC = () => {
                     {isMaxStock && <p className="text-xs text-red-500 mt-1 font-medium">Available stock: {item.stock}</p>}
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center border border-gray-300 rounded-lg">
+                    <div className="flex items-center gap-3">
                       <button 
                         onClick={() => dispatch({ type: 'UPDATE_CART_QTY', payload: { id: item.id, qty: item.quantity - 1 } })}
-                        className="p-2 hover:bg-gray-100"
+                        className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                        title="Decrease Quantity"
                       >
                         <Minus size={16} />
                       </button>
-                      <span className="px-4 font-medium">{item.quantity}</span>
+                      <span className="w-8 text-center font-bold text-gray-900">{item.quantity}</span>
                       <button 
                          onClick={() => {
                              if (!isMaxStock) {
@@ -163,14 +164,20 @@ const Cart: React.FC = () => {
                              }
                          }}
                          disabled={isMaxStock}
-                         className={`p-2 ${isMaxStock ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                         className={`p-2 rounded-lg transition-colors ${
+                             isMaxStock 
+                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                             : 'bg-green-100 text-green-600 hover:bg-green-200'
+                         }`}
+                         title="Increase Quantity"
                       >
                         <Plus size={16} />
                       </button>
                     </div>
                     <button 
                       onClick={() => dispatch({ type: 'REMOVE_FROM_CART', payload: item.id })}
-                      className="text-red-500 hover:text-red-700 p-2"
+                      className="text-red-500 hover:text-red-700 p-2 ml-2"
+                      title="Remove Item"
                     >
                       <Trash2 size={20} />
                     </button>

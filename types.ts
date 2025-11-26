@@ -12,6 +12,7 @@ export interface User {
   role: UserRole;
   token?: string;
   mobileNumber?: string; // Added to persist contact info
+  profilePicture?: string; // Added for Google Login
 }
 
 export interface Product {

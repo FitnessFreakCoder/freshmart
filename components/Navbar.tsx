@@ -12,12 +12,16 @@ const Navbar: React.FC = () => {
 
   const cartCount = state.cart.reduce((acc, item) => acc + item.quantity, 0);
 
+  const closeMenu = () => setIsMenuOpen(false);
+
   const handleLogout = () => {
     dispatch({ type: 'SET_USER', payload: null });
+    closeMenu();
     navigate('/login');
   };
 
   const handleCartClick = () => {
+    closeMenu();
     if (!state.user) {
       alert("Please sign in to view your cart.");
       navigate('/login');
@@ -35,7 +39,7 @@ const Navbar: React.FC = () => {
           
           {/* Left: Logo & Location */}
           <div className="flex items-center gap-6">
-            <Link to="/" className="flex-shrink-0 flex items-center gap-1">
+            <Link to="/" onClick={closeMenu} className="flex-shrink-0 flex items-center gap-1">
               <span className="text-2xl font-bold tracking-tight text-gray-900">Freshmart<span className="text-orange-500">.</span></span>
             </Link>
             
@@ -56,6 +60,17 @@ const Navbar: React.FC = () => {
               </div>
           </div>
 
+          {/* Mobile Cart: Visible only on mobile and if items exist */}
+          {!isLoginPage && cartCount > 0 && (
+             <button 
+                onClick={handleCartClick}
+                className="md:hidden flex items-center gap-1.5 bg-green-50 px-3 py-1.5 rounded-full border border-green-100"
+             >
+                <ShoppingCart className="h-5 w-5 text-green-700" />
+                <span className="font-bold text-sm text-green-700">{cartCount}</span>
+             </button>
+          )}
+
           {/* Right: Actions */}
           <div className="hidden md:flex items-center space-x-6">
              {state.user && (
@@ -72,7 +87,20 @@ const Navbar: React.FC = () => {
              
              {state.user ? (
                 <div className="flex items-center gap-4">
-                   <span className="text-sm font-bold text-gray-700">{state.user.username}</span>
+                   <div className="flex items-center gap-2">
+                       {state.user.profilePicture ? (
+                           <img 
+                               src={state.user.profilePicture} 
+                               alt={state.user.username} 
+                               className="h-8 w-8 rounded-full border border-gray-200"
+                           />
+                       ) : (
+                           <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold">
+                               {state.user.username.charAt(0).toUpperCase()}
+                           </div>
+                       )}
+                       <span className="text-sm font-bold text-gray-700">{state.user.username}</span>
+                   </div>
                    <button onClick={handleLogout} className="text-gray-400 hover:text-gray-600">
                      <LogOut className="h-5 w-5" />
                    </button>
@@ -107,23 +135,26 @@ const Navbar: React.FC = () => {
       </div>
 
       {isMenuOpen && (
-        <div className="md:hidden bg-white border-t">
+        <div className="md:hidden bg-white border-t absolute w-full left-0 shadow-lg z-50">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Shop</Link>
+            <Link to="/" onClick={closeMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Shop</Link>
             
+            {/* Show Cart link in menu even if icon is visible in header, for completeness */}
             {!isLoginPage && (
                 <button onClick={handleCartClick} className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">
                     Cart ({cartCount})
                 </button>
             )}
 
-            {state.user && <Link to="/orders" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Orders</Link>}
-            {(isAdmin || isStaff) && <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Dashboard</Link>}
+            {state.user && <Link to="/orders" onClick={closeMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Orders</Link>}
+            
+            {(isAdmin || isStaff) && <Link to="/admin" onClick={closeMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Dashboard</Link>}
+            
             {!state.user ? (
-               <Link to="/login" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Login</Link>
+               <Link to="/login" onClick={closeMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">Login</Link>
             ) : (
               <button onClick={handleLogout} className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50">
-                Logout
+                Logout ({state.user.username})
               </button>
             )}
           </div>

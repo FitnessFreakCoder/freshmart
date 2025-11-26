@@ -39,25 +39,35 @@ const Home: React.FC = () => {
       <div className="flex flex-col md:flex-row gap-8 items-start">
         
         {/* Sidebar */}
-        <aside className="w-full md:w-64 flex-shrink-0 sticky top-24 space-y-6">
+        <aside className="w-full md:w-64 flex-shrink-0 md:sticky md:top-24 space-y-6">
             {/* Categories */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                <div className="p-4 border-b border-gray-100 bg-gray-50 hidden md:block">
                     <h2 className="font-bold text-gray-700">Categories</h2>
                 </div>
-                <ul className="divide-y divide-gray-100">
+                {/* Mobile: Horizontal Scroll | Desktop: Vertical List */}
+                <ul className="flex md:flex-col overflow-x-auto md:overflow-visible p-3 md:p-0 gap-3 md:gap-0 md:divide-y md:divide-gray-100">
                     {categories.map(c => (
-                        <li key={c}>
+                        <li key={c} className="flex-shrink-0">
                             <button
                                 onClick={() => setSelectedCategory(c)}
-                                className={`w-full text-left px-4 py-3 text-sm font-medium flex justify-between items-center transition-colors hover:bg-gray-50 ${
-                                    selectedCategory === c 
-                                        ? 'text-green-600 bg-green-50 border-l-4 border-green-600' 
-                                        : 'text-gray-600 border-l-4 border-transparent'
-                                }`}
+                                className={`
+                                    text-sm font-medium transition-all
+                                    
+                                    /* Mobile: Rectangle Box */
+                                    px-4 py-2 rounded-lg border shadow-sm
+                                    
+                                    /* Desktop: Sidebar Item */
+                                    md:shadow-none md:w-full md:text-left md:px-4 md:py-3 md:rounded-none md:border-0 md:border-l-4 md:flex md:justify-between md:items-center
+
+                                    ${selectedCategory === c 
+                                        ? 'bg-green-600 text-white border-green-600 md:bg-green-50 md:text-green-600 md:border-l-green-600' 
+                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 md:border-l-transparent'
+                                    }
+                                `}
                             >
                                 {c}
-                                {selectedCategory === c && <ChevronRight size={16} />}
+                                <span className="hidden md:inline">{selectedCategory === c && <ChevronRight size={16} />}</span>
                             </button>
                         </li>
                     ))}
